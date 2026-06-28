@@ -59,6 +59,13 @@
     position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     background:rgba(0,0,0,.55); color:#fff; font-weight:600; font-size:15px; text-align:center;
   }
+  .torch-btn{
+    position:absolute; top:12px; right:12px; width:44px; height:44px; border-radius:50%;
+    background:rgba(0,0,0,.5); border:2px solid rgba(255,255,255,.35);
+    display:none; align-items:center; justify-content:center; color:#fff; padding:0;
+  }
+  .torch-btn svg{width:20px; height:20px;}
+  .torch-btn.active{background:var(--accent); border-color:var(--accent); color:#06140f;}
 
   label{display:block; font-size:13px; color:var(--muted); margin:14px 0 6px;}
   input[type=text]{
@@ -105,6 +112,9 @@
     <div class="screen" id="screen-capture">
       <div class="video-wrap">
         <video id="video" playsinline muted autoplay></video>
+        <button class="torch-btn" id="btnTorch" type="button" aria-label="Toggle flashlight">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>
+        </button>
         <div class="analyzing" id="analyzingOverlay" style="display:none;">Analyzing photo…</div>
       </div>
       <div class="row" id="captureButtons">
@@ -147,6 +157,8 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwLffZOj87u9KRF
 
 // ===== STATE =====
 let stream = null;
+let currentTrack = null;
+let torchOn = false;
 let deviceId = '';
 let deviceType = '';
 let deviceLocation = '';
@@ -163,6 +175,7 @@ const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const analyzingOverlay = document.getElementById('analyzingOverlay');
+const btnTorch = document.getElementById('btnTorch');
 const captureButtons = document.getElementById('captureButtons');
 
 function showScreen(name){
@@ -185,14 +198,39 @@ async function startCamera(){
   });
   video.srcObject = stream;
   await video.play();
+
+  torchOn = false;
+  btnTorch.classList.remove('active');
+  currentTrack = stream.getVideoTracks()[0];
+  let capabilities = {};
+  try{ capabilities = currentTrack.getCapabilities ? currentTrack.getCapabilities() : {}; }catch(err){}
+  btnTorch.style.display = capabilities.torch ? 'flex' : 'none';
 }
 
 function stopCamera(){
+  if (currentTrack && torchOn){
+    try{ currentTrack.applyConstraints({ advanced: [{ torch: false }] }); }catch(err){}
+  }
   if (stream){
     stream.getTracks().forEach(t => t.stop());
     stream = null;
   }
+  currentTrack = null;
+  torchOn = false;
+  btnTorch.classList.remove('active');
 }
+
+btnTorch.addEventListener('click', async () => {
+  if (!currentTrack) return;
+  const next = !torchOn;
+  try{
+    await currentTrack.applyConstraints({ advanced: [{ torch: next }] });
+    torchOn = next;
+    btnTorch.classList.toggle('active', torchOn);
+  }catch(err){
+    showToast('Torch not supported on this device', true);
+  }
+});
 
 document.getElementById('btnStartCamera').addEventListener('click', async () => {
   try{
