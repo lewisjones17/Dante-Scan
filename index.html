@@ -30,8 +30,9 @@
   }
   .screen{display:none;}
   .screen.active{display:block;}
+  .hint{text-align:center; color:var(--muted); font-size:13px; margin-bottom:16px;}
 
-  .pillrow{display:flex; gap:8px; justify-content:center; margin-bottom:18px;}
+  .pillrow{display:flex; gap:8px; justify-content:center; margin-bottom:6px;}
   .pill{
     flex:1; padding:10px 0; border-radius:999px; border:2px solid #2a2f3d;
     background:transparent; color:var(--muted); font-weight:600; font-size:14px;
@@ -54,15 +55,9 @@
     aspect-ratio:3/4;
   }
   video{width:100%; height:100%; object-fit:cover; display:block;}
-  .guide-box{
-    position:absolute; border:3px solid var(--accent); border-radius:10px;
-    box-shadow:0 0 0 9999px rgba(0,0,0,.35);
-  }
-  .guide-qr{top:30%; left:20%; width:60%; height:40%;}
-  .guide-ocr{top:38%; left:8%; width:84%; height:24%;}
-  .status-text{
-    position:absolute; bottom:10px; left:0; right:0; text-align:center;
-    color:#fff; font-size:13px; font-weight:600; text-shadow:0 1px 3px rgba(0,0,0,.8);
+  .analyzing{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.55); color:#fff; font-weight:600; font-size:15px; text-align:center;
   }
 
   label{display:block; font-size:13px; color:var(--muted); margin:14px 0 6px;}
@@ -102,38 +97,32 @@
 
     <!-- SCREEN 1: start -->
     <div class="screen active" id="screen-start">
-      <div class="pillrow">
-        <button class="pill mode-pill active" data-mode="auto">Auto</button>
-        <button class="pill mode-pill" data-mode="qr">QR only</button>
-        <button class="pill mode-pill" data-mode="ocr">Text only</button>
-      </div>
+      <div class="hint">Point the camera at the device label, then capture.</div>
       <button class="btn btn-primary" id="btnStartCamera">Start Camera</button>
     </div>
 
-    <!-- SCREEN 2: scanning -->
-    <div class="screen" id="screen-scan">
+    <!-- SCREEN 2: capture -->
+    <div class="screen" id="screen-capture">
       <div class="video-wrap">
         <video id="video" playsinline muted autoplay></video>
-        <div class="guide-box" id="guideBox"></div>
-        <div class="status-text" id="statusText">Looking for QR code…</div>
+        <div class="analyzing" id="analyzingOverlay" style="display:none;">Analyzing photo…</div>
       </div>
-      <div class="row">
-        <button class="btn btn-secondary" id="btnSwitchMode">Switch to text scan</button>
-        <button class="btn btn-secondary" id="btnCaptureText" style="display:none;">Capture text</button>
+      <div class="row" id="captureButtons">
+        <button class="btn btn-secondary" id="btnCancelCapture">Cancel</button>
+        <button class="btn btn-primary" id="btnCapture">Capture</button>
       </div>
-      <button class="btn btn-danger" id="btnCancelScan">Cancel</button>
     </div>
 
-    <!-- SCREEN 3: confirm device id -->
-    <div class="screen" id="screen-id">
+    <!-- SCREEN 3: review + send -->
+    <div class="screen" id="screen-review">
+      <img id="reviewPhoto" class="photo-preview">
+
       <label>Device ID (edit if needed)</label>
       <input type="text" id="deviceIdInput" placeholder="Scanned ID will appear here">
 
       <label>Device Type</label>
-      <div class="pillrow" id="deviceTypeAuto" style="display:none; justify-content:flex-start;">
-        <div class="pill active" style="flex:none; padding:10px 16px;" id="deviceTypeAutoLabel">Audinate AVIO (auto)</div>
-      </div>
-      <div class="pillrow" id="deviceTypeManual" style="display:none;">
+      <div class="pillrow">
+        <button class="pill devicetype-pill" data-devicetype="Audinate AVIO">AVIO</button>
         <button class="pill devicetype-pill" data-devicetype="Neutrik">Neutrik</button>
         <button class="pill devicetype-pill" data-devicetype="Glensound">Glensound</button>
       </div>
@@ -141,36 +130,10 @@
       <label>Location</label>
       <input type="text" id="locationInput" placeholder="e.g. Commentary Booth 3">
 
-      <button class="btn btn-primary" id="btnToPhoto">Next: take photo</button>
-      <button class="btn btn-secondary" id="btnRescan">Rescan</button>
-    </div>
-
-    <!-- SCREEN 4: photo -->
-    <div class="screen" id="screen-photo">
-      <div class="video-wrap" id="photoVideoWrap">
-        <video id="videoPhoto" playsinline muted autoplay></video>
+      <div class="row">
+        <button class="btn btn-secondary" id="btnRetake">Retake</button>
+        <button class="btn btn-primary" id="btnSend">Send</button>
       </div>
-      <img id="photoPreview" class="photo-preview" style="display:none;">
-      <div class="row" id="photoButtons">
-        <button class="btn btn-primary" id="btnTakePhoto">Take Photo</button>
-      </div>
-      <div class="row" id="photoConfirmButtons" style="display:none;">
-        <button class="btn btn-secondary" id="btnRetakePhoto">Retake</button>
-        <button class="btn btn-primary" id="btnConfirmPhoto">Use Photo</button>
-      </div>
-    </div>
-
-    <!-- SCREEN 5: send -->
-    <div class="screen" id="screen-send">
-      <label>Location</label>
-      <input type="text" id="finalLocation" readonly>
-      <label>Device Type</label>
-      <input type="text" id="finalDeviceType" readonly>
-      <label>Device ID</label>
-      <input type="text" id="finalDeviceId" readonly>
-      <img id="finalPhotoPreview" class="photo-preview" style="margin-top:12px;">
-      <button class="btn btn-primary" id="btnSend">Send</button>
-      <button class="btn btn-secondary" id="btnStartOver">Start Over</button>
     </div>
 
   </div>
@@ -180,36 +143,27 @@
 
 <script>
 // ===== CONFIG =====
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwLffZOj87u9KRFbLCFRVtJ5VRd9Gh2DLfkBY0vfOBo3R1o0nCr7PE1Xwd8FSiHwgBw/exec';
-const AUTO_QR_TIMEOUT_MS = 4000; // in Auto mode, how long to try QR before offering text fallback
+const APPS_SCRIPT_URL = 'PASTE_YOUR_DEPLOYED_WEB_APP_URL_HERE'; // .../exec
 
 // ===== STATE =====
-let mode = 'auto'; // auto | qr | ocr
 let stream = null;
-let scanningQR = false;
-let qrTimeoutHandle = null;
 let deviceId = '';
 let deviceType = '';
 let deviceLocation = '';
-let scanType = 'manual';
+let scanType = 'manual'; // qr | ocr | manual
 let photoDataUrl = '';
 
 // ===== ELEMENTS =====
 const screens = {
   start: document.getElementById('screen-start'),
-  scan: document.getElementById('screen-scan'),
-  id: document.getElementById('screen-id'),
-  photo: document.getElementById('screen-photo'),
-  send: document.getElementById('screen-send'),
+  capture: document.getElementById('screen-capture'),
+  review: document.getElementById('screen-review'),
 };
 const video = document.getElementById('video');
-const videoPhoto = document.getElementById('videoPhoto');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-const statusText = document.getElementById('statusText');
-const guideBox = document.getElementById('guideBox');
-const btnSwitchMode = document.getElementById('btnSwitchMode');
-const btnCaptureText = document.getElementById('btnCaptureText');
+const analyzingOverlay = document.getElementById('analyzingOverlay');
+const captureButtons = document.getElementById('captureButtons');
 
 function showScreen(name){
   Object.values(screens).forEach(s => s.classList.remove('active'));
@@ -224,22 +178,13 @@ function showToast(text, isError){
   setTimeout(() => toast.classList.remove('show'), 2200);
 }
 
-// ===== MODE PILLS =====
-document.querySelectorAll('.mode-pill').forEach(pill => {
-  pill.addEventListener('click', () => {
-    document.querySelectorAll('.mode-pill').forEach(p => p.classList.remove('active'));
-    pill.classList.add('active');
-    mode = pill.dataset.mode;
-  });
-});
-
 // ===== CAMERA =====
-async function startCamera(targetVideoEl){
+async function startCamera(){
   stream = await navigator.mediaDevices.getUserMedia({
     video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 960 } }
   });
-  targetVideoEl.srcObject = stream;
-  await targetVideoEl.play();
+  video.srcObject = stream;
+  await video.play();
 }
 
 function stopCamera(){
@@ -251,109 +196,76 @@ function stopCamera(){
 
 document.getElementById('btnStartCamera').addEventListener('click', async () => {
   try{
-    await startCamera(video);
-    showScreen('scan');
-    beginScanning();
+    await startCamera();
+    analyzingOverlay.style.display = 'none';
+    captureButtons.style.display = 'flex';
+    showScreen('capture');
   }catch(err){
     showToast('Camera error: ' + err.message, true);
   }
 });
 
-document.getElementById('btnCancelScan').addEventListener('click', () => {
-  scanningQR = false;
-  clearTimeout(qrTimeoutHandle);
+document.getElementById('btnCancelCapture').addEventListener('click', () => {
   stopCamera();
   showScreen('start');
 });
 
-// ===== SCAN MODE SWITCHING (inside scan screen) =====
-function beginScanning(){
-  if (mode === 'ocr'){
-    enterOCRUI();
-  } else {
-    enterQRUI();
-    if (mode === 'auto'){
-      qrTimeoutHandle = setTimeout(() => {
-        if (scanningQR){
-          enterOCRUI();
-        }
-      }, AUTO_QR_TIMEOUT_MS);
-    }
-  }
-}
-
-function enterQRUI(){
-  guideBox.className = 'guide-box guide-qr';
-  statusText.textContent = 'Looking for QR code…';
-  btnSwitchMode.textContent = 'Switch to text scan';
-  btnSwitchMode.style.display = 'block';
-  btnCaptureText.style.display = 'none';
-  scanningQR = true;
-  requestAnimationFrame(tickQR);
-}
-
-function enterOCRUI(){
-  clearTimeout(qrTimeoutHandle);
-  scanningQR = false;
-  guideBox.className = 'guide-box guide-ocr';
-  statusText.textContent = 'Align label text in box, then tap Capture';
-  btnSwitchMode.textContent = 'Switch to QR scan';
-  btnSwitchMode.style.display = (mode === 'auto') ? 'block' : 'none';
-  btnCaptureText.style.display = 'block';
-}
-
-btnSwitchMode.addEventListener('click', () => {
-  if (guideBox.classList.contains('guide-qr')){
-    enterOCRUI();
-  } else {
-    enterQRUI();
-  }
-});
-
-btnCaptureText.addEventListener('click', runOCR);
-
-// ===== QR SCAN LOOP =====
-function tickQR(){
-  if (!scanningQR) return;
-  if (video.readyState === video.HAVE_ENOUGH_DATA){
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, imageData.width, imageData.height);
-    if (code && code.data){
-      scanningQR = false;
-      clearTimeout(qrTimeoutHandle);
-      onIdDetected(code.data, 'qr');
-      return;
-    }
-  }
-  requestAnimationFrame(tickQR);
-}
-
-// ===== OCR CAPTURE =====
-// NOTE: crop box below is a starting guess (centered band, 84% width / 24% height,
-// vertical start ~38%). Tune these % values once we see real Neutrik/Glensound
-// label photos, same way the Exterity crop was tuned for MacSnap.
-async function runOCR(){
-  statusText.textContent = 'Reading text…';
+// ===== CAPTURE (single shot — this photo is analyzed AND uploaded) =====
+document.getElementById('btnCapture').addEventListener('click', async () => {
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  photoDataUrl = canvas.toDataURL('image/jpeg', 0.85);
 
+  stopCamera();
+  captureButtons.style.display = 'none';
+  analyzingOverlay.style.display = 'flex';
+
+  await analyzeCapture();
+
+  document.getElementById('reviewPhoto').src = photoDataUrl;
+  document.getElementById('deviceIdInput').value = deviceId;
+  selectDeviceTypePill(deviceType);
+
+  const locationInput = document.getElementById('locationInput');
+  if (!locationInput.value){
+    locationInput.value = localStorage.getItem('dantesnap_last_location') || '';
+  }
+
+  showScreen('review');
+});
+
+// ===== ANALYZE: try QR on full frame, fall back to OCR on a center crop =====
+async function analyzeCapture(){
+  deviceId = '';
+  deviceType = '';
+  scanType = 'manual';
+
+  // 1. QR — scan the full captured frame (QR can be anywhere in shot, e.g. AVIO label)
+  const fullImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const code = jsQR(fullImageData.data, fullImageData.width, fullImageData.height);
+  if (code && code.data){
+    deviceId = code.data;
+    deviceType = 'Audinate AVIO';
+    scanType = 'qr';
+    return;
+  }
+
+  // 2. No QR — OCR fallback on a center-weighted crop.
+  // NOTE: crop box is a starting guess, not yet tuned to real Neutrik/Glensound
+  // label photos — same as before, recalibrate once we have those.
   const cropX = canvas.width * 0.08;
   const cropY = canvas.height * 0.38;
   const cropW = canvas.width * 0.84;
   const cropH = canvas.height * 0.24;
 
   const cropCanvas = document.createElement('canvas');
-  const scale = 2; // 2x upscale
+  const scale = 2;
   cropCanvas.width = cropW * scale;
   cropCanvas.height = cropH * scale;
   const cropCtx = cropCanvas.getContext('2d');
   cropCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropCanvas.width, cropCanvas.height);
 
-  // grayscale + simple contrast stretch
   const imgData = cropCtx.getImageData(0, 0, cropCanvas.width, cropCanvas.height);
   const d = imgData.data;
   let min = 255, max = 0;
@@ -373,65 +285,42 @@ async function runOCR(){
   try{
     const result = await Tesseract.recognize(cropCanvas.toDataURL('image/png'), 'eng');
     const text = result.data.text.replace(/\s+/g, ' ').trim();
-    scanningQR = false;
     if (text){
-      onIdDetected(text, 'ocr');
-    } else {
-      statusText.textContent = 'No text found — try again or adjust position';
+      deviceId = text;
+      scanType = 'ocr';
     }
   }catch(err){
-    statusText.textContent = 'OCR error — try again';
+    // leave deviceId blank for manual entry
   }
 }
 
-// ===== ID DETECTED → confirm screen =====
-function onIdDetected(text, type){
-  stopCamera();
-  deviceId = text;
-  scanType = type;
-  document.getElementById('deviceIdInput').value = deviceId;
-
-  const autoBox = document.getElementById('deviceTypeAuto');
-  const manualBox = document.getElementById('deviceTypeManual');
-  if (type === 'qr'){
-    deviceType = 'Audinate AVIO';
-    autoBox.style.display = 'flex';
-    manualBox.style.display = 'none';
-  } else {
-    deviceType = '';
-    autoBox.style.display = 'none';
-    manualBox.style.display = 'flex';
-    document.querySelectorAll('.devicetype-pill').forEach(p => p.classList.remove('active'));
-  }
-
-  const locationInput = document.getElementById('locationInput');
-  if (!locationInput.value){
-    locationInput.value = localStorage.getItem('dantesnap_last_location') || '';
-  }
-
-  showScreen('id');
+// ===== DEVICE TYPE PILLS (AVIO / Neutrik / Glensound — always manually selectable) =====
+function selectDeviceTypePill(type){
+  document.querySelectorAll('.devicetype-pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.devicetype === type);
+  });
 }
-
-// device type pill selection (Neutrik / Glensound — only shown for OCR/manual scans)
 document.querySelectorAll('.devicetype-pill').forEach(pill => {
   pill.addEventListener('click', () => {
-    document.querySelectorAll('.devicetype-pill').forEach(p => p.classList.remove('active'));
-    pill.classList.add('active');
     deviceType = pill.dataset.devicetype;
+    selectDeviceTypePill(deviceType);
   });
 });
 
-document.getElementById('btnRescan').addEventListener('click', async () => {
+// ===== RETAKE =====
+document.getElementById('btnRetake').addEventListener('click', async () => {
   try{
-    await startCamera(video);
-    showScreen('scan');
-    beginScanning();
+    await startCamera();
+    analyzingOverlay.style.display = 'none';
+    captureButtons.style.display = 'flex';
+    showScreen('capture');
   }catch(err){
     showToast('Camera error: ' + err.message, true);
   }
 });
 
-document.getElementById('btnToPhoto').addEventListener('click', async () => {
+// ===== SEND (same captured photo — no separate upload photo) =====
+document.getElementById('btnSend').addEventListener('click', async () => {
   deviceId = document.getElementById('deviceIdInput').value.trim();
   if (!deviceId){
     showToast('Enter a device ID first', true);
@@ -446,63 +335,14 @@ document.getElementById('btnToPhoto').addEventListener('click', async () => {
     showToast('Enter a location', true);
     return;
   }
-  localStorage.setItem('dantesnap_last_location', deviceLocation);
-
-  showScreen('photo');
-  document.getElementById('photoPreview').style.display = 'none';
-  document.getElementById('photoVideoWrap').style.display = 'block';
-  document.getElementById('photoButtons').style.display = 'flex';
-  document.getElementById('photoConfirmButtons').style.display = 'none';
-  try{
-    await startCamera(videoPhoto);
-  }catch(err){
-    showToast('Camera error: ' + err.message, true);
-  }
-});
-
-// ===== PHOTO CAPTURE =====
-document.getElementById('btnTakePhoto').addEventListener('click', () => {
-  canvas.width = videoPhoto.videoWidth;
-  canvas.height = videoPhoto.videoHeight;
-  ctx.drawImage(videoPhoto, 0, 0, canvas.width, canvas.height);
-  photoDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-
-  stopCamera();
-  document.getElementById('photoVideoWrap').style.display = 'none';
-  const preview = document.getElementById('photoPreview');
-  preview.src = photoDataUrl;
-  preview.style.display = 'block';
-  document.getElementById('photoButtons').style.display = 'none';
-  document.getElementById('photoConfirmButtons').style.display = 'flex';
-});
-
-document.getElementById('btnRetakePhoto').addEventListener('click', async () => {
-  document.getElementById('photoPreview').style.display = 'none';
-  document.getElementById('photoVideoWrap').style.display = 'block';
-  document.getElementById('photoButtons').style.display = 'flex';
-  document.getElementById('photoConfirmButtons').style.display = 'none';
-  try{
-    await startCamera(videoPhoto);
-  }catch(err){
-    showToast('Camera error: ' + err.message, true);
-  }
-});
-
-document.getElementById('btnConfirmPhoto').addEventListener('click', () => {
-  document.getElementById('finalLocation').value = deviceLocation;
-  document.getElementById('finalDeviceType').value = deviceType;
-  document.getElementById('finalDeviceId').value = deviceId;
-  document.getElementById('finalPhotoPreview').src = photoDataUrl;
-  showScreen('send');
-});
-
-// ===== SEND =====
-document.getElementById('btnSend').addEventListener('click', async () => {
-  const btn = document.getElementById('btnSend');
   if (APPS_SCRIPT_URL.includes('PASTE_YOUR')){
     showToast('Set APPS_SCRIPT_URL in the file first', true);
     return;
   }
+
+  localStorage.setItem('dantesnap_last_location', deviceLocation);
+
+  const btn = document.getElementById('btnSend');
   btn.disabled = true;
   btn.textContent = 'Sending…';
 
@@ -525,12 +365,11 @@ document.getElementById('btnSend').addEventListener('click', async () => {
     resetAll();
   }catch(err){
     showToast('Send failed — check connection', true);
+  }finally{
     btn.disabled = false;
     btn.textContent = 'Send';
   }
 });
-
-document.getElementById('btnStartOver').addEventListener('click', resetAll);
 
 function resetAll(){
   deviceId = '';
@@ -538,9 +377,7 @@ function resetAll(){
   scanType = 'manual';
   photoDataUrl = '';
   document.getElementById('deviceIdInput').value = '';
-  const btn = document.getElementById('btnSend');
-  btn.disabled = false;
-  btn.textContent = 'Send';
+  selectDeviceTypePill('');
   showScreen('start');
 }
 </script>
