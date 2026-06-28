@@ -232,10 +232,7 @@ document.getElementById('btnCapture').addEventListener('click', async () => {
   document.getElementById('deviceIdInput').value = deviceId;
   selectDeviceTypePill(deviceType);
 
-  const locationInput = document.getElementById('locationInput');
-  if (!locationInput.value){
-    locationInput.value = localStorage.getItem('dantesnap_last_location') || '';
-  }
+  document.getElementById('locationInput').value = '';
 
   showScreen('review');
 });
@@ -359,9 +356,7 @@ document.getElementById('btnSend').addEventListener('click', async () => {
     showToast('Set APPS_SCRIPT_URL in the file first', true);
     return;
   }
-
-  localStorage.setItem('dantesnap_last_location', deviceLocation);
-
+  
   const btn = document.getElementById('btnSend');
   btn.disabled = true;
   btn.textContent = 'Sending…';
